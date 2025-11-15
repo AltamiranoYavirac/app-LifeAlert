@@ -24,20 +24,20 @@ class OptionsPage extends StatelessWidget {
         child: ListView(
           children: <Widget>[
             const SizedBox(height: 8),
-            _buildCard(context, 'Condición médica', 'Detalles de enfermedad'),
-            _buildCard(context, 'Medicamentos', 'Lista de medicinas actuales'),
-            _buildCard(context, 'Alergias', 'Alergias y reacciones'),
+            _buildCard(context, 'Condición médica', 'Detalles de enfermedad', icon: Icons.favorite, color: Colors.red),
+            _buildCard(context, 'Medicamentos', 'Lista de medicinas actuales', icon: Icons.medication, color: Colors.purple),
+            _buildCard(context, 'Alergias', 'Alergias y reacciones', icon: Icons.warning_amber_rounded, color: Colors.orange),
             const SizedBox(height: 12),
             const Text('Historial y Seguimiento', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildCard(context, 'Citas médicas', 'Próximas consultas'),
-            _buildCard(context, 'Historial de alertas', 'Emergencias registradas'),
-            _buildCard(context, 'Registro de síntomas', 'Diario de salud'),
+            _buildCard(context, 'Citas médicas', 'Próximas consultas', icon: Icons.calendar_month, color: Colors.blue),
+            _buildCard(context, 'Historial de alertas', 'Emergencias registradas', icon: Icons.history, color: Colors.green),
+            _buildCard(context, 'Registro de síntomas', 'Diario de salud', icon: Icons.article, color: Colors.teal),
             const SizedBox(height: 12),
             const Text('Documentos', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            _buildCard(context, 'Documentos médicos', 'Estudios y recetas'),
-            _buildCard(context, 'Información de seguro', 'Pólizas y cobertura'),
+            _buildCard(context, 'Documentos médicos', 'Estudios y recetas', icon: Icons.description, color: Colors.deepPurple),
+            _buildCard(context, 'Información de seguro', 'Pólizas y cobertura', icon: Icons.shield, color: Colors.pink),
             const SizedBox(height: 20),
             Card(
               color: Colors.red.shade50,
@@ -59,11 +59,20 @@ class OptionsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(BuildContext context, String title, String subtitle) {
+  Widget _buildCard(BuildContext context, String title, String subtitle, {required IconData icon, required Color color}) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListTile(
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color),
+        ),
         title: Text(title),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
