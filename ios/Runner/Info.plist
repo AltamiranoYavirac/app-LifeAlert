@@ -22,6 +22,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Permisos de ubicación: mensajes que verán los usuarios al solicitar permiso -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Se requiere la ubicación para anotar dónde se activó la alerta y ayudar a los servicios de emergencia.</string>
+	<!-- Si necesita ubicación en segundo plano, habilite también la siguiente clave y gestione los permisos adecuadamente -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Se requiere la ubicación en segundo plano para registrar la ubicación de incidentes incluso cuando la app no está en primer plano.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

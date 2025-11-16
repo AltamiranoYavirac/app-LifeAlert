@@ -6,6 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'options.dart';
 import 'senttings.dart';
 
+// Global key to access OptionsPage state so other pages (Inicio) can add alerts
+final GlobalKey optionsPageKey = GlobalKey();
+
 void main() {
   runApp(const MyApp());
 }
@@ -35,9 +38,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _pages = <Widget>[
+  // pages built here so we can pass the GlobalKey to OptionsPage
+  final List<Widget> _pages = <Widget>[
     const InicioPage(),
-    const OptionsPage(),
+    OptionsPage(key: optionsPageKey),
     const SenttingsPage(),
   ];
 
@@ -127,6 +131,11 @@ class _InicioPageState extends State<InicioPage> {
       const SnackBar(content: Text('Alerta activada: notificando contactos y servicios')),
     );
     // Aquí podríamos añadir lógica adicional: compartir ubicación, enviar SMS, llamar a contacto, etc.
+    // Añadir entrada al historial de alertas en OptionsPage (si existe)
+    try {
+      final dyn = optionsPageKey.currentState as dynamic;
+      dyn?.addAlert(datetime: DateTime.now(), location: '', description: 'Alerta activada desde botón de pánico', status: 'Alerta');
+    } catch (_) {}
     Future.delayed(const Duration(milliseconds: 800), () {
       setState(() => _holdProgress = 0.0);
     });

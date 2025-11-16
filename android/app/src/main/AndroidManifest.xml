@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Permisos necesarios para capturar ubicación (usados por geolocator) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Si necesita ubicación en segundo plano, considere añadir:
+         <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+         y gestionar compatibilidad con Android 10/11/12+ -->
     <application
         android:label="flutter_application_1"
         android:name="${applicationName}"
