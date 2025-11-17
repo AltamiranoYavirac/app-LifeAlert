@@ -12,6 +12,132 @@ class _SenttingsPageState extends State<SenttingsPage> {
   bool _location = true;
   bool _autoCall = false;
 
+  // Variables de Perfil
+  String _nombres = "";
+  String _apellidos = "";
+  String _edad = "";
+  List<String> _enfermedades = [];
+
+  final List<String> enfermedadesCatastroficas = [
+    'Cáncer',
+    'Insuficiencia renal',
+    'Cardiopatía grave',
+    'Esclerosis múltiple',
+    'Trasplante de órganos'
+  ];
+
+  // Funciones para cada Switch
+  Future<void> _toggleNotifications(bool value) async {
+    setState(() => _notifications = value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+        value ? 'Notificaciones activadas' : 'Notificaciones desactivadas'
+      )),
+    );
+    // Aquí integras la lógica real (Firebase Messaging, etc.)
+  }
+
+  Future<void> _toggleLocation(bool value) async {
+    setState(() => _location = value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+        value ? 'Compartiendo ubicación GPS' : 'Ubicación GPS desactivada'
+      )),
+    );
+    // Aquí integras la lógica real (Geolocator, etc.)
+  }
+
+  Future<void> _toggleAutoCall(bool value) async {
+    setState(() => _autoCall = value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(
+        value ? 'Llamada automática activada' : 'Llamada automática desactivada'
+      )),
+    );
+    // Aquí integras la lógica real (url_launcher para llamadas)
+  }
+
+  // Cuadro de edición de perfil
+  void _showEditProfileDialog() {
+    String nombres = _nombres;
+    String apellidos = _apellidos;
+    String edad = _edad;
+    List<String> enfermedadesSeleccionadas = List.from(_enfermedades);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Editar perfil'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Nombres'),
+                      controller: TextEditingController(text: nombres),
+                      onChanged: (v) => setDialogState(() => nombres = v),
+                    ),
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Apellidos'),
+                      controller: TextEditingController(text: apellidos),
+                      onChanged: (v) => setDialogState(() => apellidos = v),
+                    ),
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Edad'),
+                      keyboardType: TextInputType.number,
+                      controller: TextEditingController(text: edad),
+                      onChanged: (v) => setDialogState(() => edad = v),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Enfermedad(es) catastrófica:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ...enfermedadesCatastroficas.map((enfermedad) {
+                      return CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(enfermedad),
+                        value: enfermedadesSeleccionadas.contains(enfermedad),
+                        onChanged: (checked) {
+                          setDialogState(() {
+                            if (checked == true) {
+                              enfermedadesSeleccionadas.add(enfermedad);
+                            } else {
+                              enfermedadesSeleccionadas.remove(enfermedad);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cerrar'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  child: const Text('Guardar'),
+                  onPressed: () {
+                    setState(() {
+                      _nombres = nombres;
+                      _apellidos = apellidos;
+                      _edad = edad;
+                      _enfermedades = enfermedadesSeleccionadas;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,9 +168,13 @@ class _SenttingsPageState extends State<SenttingsPage> {
                   child: const Icon(Icons.person, color: Colors.pink),
                 ),
                 title: const Text('Perfil personal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Editar información médica', style: TextStyle(fontSize: 13)),
+                subtitle: Text(_nombres.isEmpty && _apellidos.isEmpty && _edad.isEmpty && _enfermedades.isEmpty
+                  ? 'Editar información médica'
+                  : 'Nombre: $_nombres\nApellido: $_apellidos\nEdad: $_edad\nEnfermedades: ${_enfermedades.join(", ")}',
+                  style: const TextStyle(fontSize: 13),
+                ),
                 trailing: TextButton(
-                  onPressed: () {},
+                  onPressed: _showEditProfileDialog,
                   child: const Text('Editar', style: TextStyle(color: Colors.red)),
                 ),
               ),
@@ -70,7 +200,7 @@ class _SenttingsPageState extends State<SenttingsPage> {
                     title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: const Text('Alertas push activadas', style: TextStyle(fontSize: 13)),
                     value: _notifications,
-                    onChanged: (v) => setState(() => _notifications = v),
+                    onChanged: _toggleNotifications,
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
@@ -82,7 +212,7 @@ class _SenttingsPageState extends State<SenttingsPage> {
                     title: const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: const Text('Compartir ubicación GPS', style: TextStyle(fontSize: 13)),
                     value: _location,
-                    onChanged: (v) => setState(() => _location = v),
+                    onChanged: _toggleLocation,
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
@@ -94,7 +224,7 @@ class _SenttingsPageState extends State<SenttingsPage> {
                     title: const Text('Llamada automática', style: TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: const Text('Llamar al activar pánico', style: TextStyle(fontSize: 13)),
                     value: _autoCall,
-                    onChanged: (v) => setState(() => _autoCall = v),
+                    onChanged: _toggleAutoCall,
                   ),
                 ],
               ),
@@ -204,3 +334,5 @@ class _SenttingsPageState extends State<SenttingsPage> {
     );
   }
 }
+
+
