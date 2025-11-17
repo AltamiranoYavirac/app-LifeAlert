@@ -28,7 +28,21 @@ class _SenttingsPageState extends State<SenttingsPage> {
     {'nombre': 'Contacto 2', 'telefono': '+1 234 567 891'},
   ];
 
-  // Función para mostrar cuadro de diálogo para agregar/editar contacto
+  // --- VALIDACIONES ---
+  bool _esNombreValido(String nombre) {
+    return RegExp(r'^[A-Za-záéíóúÁÉÍÓÚüÜñÑ\s]+$').hasMatch(nombre) && nombre.isNotEmpty;
+  }
+
+  bool _esTelefonoValido(String telefono) {
+    return RegExp(r'^\+?\d{8,}$').hasMatch(telefono);
+  }
+
+  bool _esEdadValida(String edad) {
+    int? edadInt = int.tryParse(edad);
+    return edadInt != null && edadInt >= 1 && edadInt <= 120;
+  }
+
+  // --- Contactos ---
   void _showContactoDialog({int? index}) {
     String initialNombre = index != null ? _contactos[index]['nombre'] ?? '' : '';
     String initialTelefono = index != null ? _contactos[index]['telefono'] ?? '' : '';
@@ -65,11 +79,26 @@ class _SenttingsPageState extends State<SenttingsPage> {
             ElevatedButton(
               child: const Text('Guardar'),
               onPressed: () {
+                final nombre = nombreController.text.trim();
+                final telefono = telefonoController.text.trim();
+
+                if (!_esNombreValido(nombre)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('El nombre no puede estar vacío y solo debe contener letras y espacios.'))
+                  );
+                  return;
+                }
+                if (!_esTelefonoValido(telefono)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Teléfono inválido. Debe ser numérico y tener al menos 8 dígitos.'))
+                  );
+                  return;
+                }
                 setState(() {
                   if (index == null) {
-                    _contactos.add({'nombre': nombreController.text, 'telefono': telefonoController.text});
+                    _contactos.add({'nombre': nombre, 'telefono': telefono});
                   } else {
-                    _contactos[index] = {'nombre': nombreController.text, 'telefono': telefonoController.text};
+                    _contactos[index] = {'nombre': nombre, 'telefono': telefono};
                   }
                 });
                 Navigator.of(context).pop();
@@ -81,7 +110,6 @@ class _SenttingsPageState extends State<SenttingsPage> {
     );
   }
 
-  // Función para mostrar cuadro de diálogo de confirmación de borrado
   void _showDeleteConfirmDialog(int index) {
     showDialog(
       context: context,
@@ -107,7 +135,7 @@ class _SenttingsPageState extends State<SenttingsPage> {
     );
   }
 
-  // --- Resto: Perfil, Alertas y Notificaciones ---
+  // --- Alertas y Notificaciones ---
   Future<void> _toggleNotifications(bool value) async {
     setState(() => _notifications = value);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -195,10 +223,27 @@ class _SenttingsPageState extends State<SenttingsPage> {
                 ElevatedButton(
                   child: const Text('Guardar'),
                   onPressed: () {
+                    final nombres = nombresController.text.trim();
+                    final apellidos = apellidosController.text.trim();
+                    final edad = edadController.text.trim();
+
+                    if (!_esNombreValido(nombres) || !_esNombreValido(apellidos)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Nombres y apellidos no pueden estar vacíos y solo deben contener letras y espacios.'))
+                      );
+                      return;
+                    }
+                    if (!_esEdadValida(edad)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Edad inválida, debe ser un número entre 1 y 120.'))
+                      );
+                      return;
+                    }
+
                     setState(() {
-                      _nombres = nombresController.text;
-                      _apellidos = apellidosController.text;
-                      _edad = edadController.text;
+                      _nombres = nombres;
+                      _apellidos = apellidos;
+                      _edad = edad;
                       _enfermedades = enfermedadesSeleccionadas;
                     });
                     Navigator.of(context).pop();
