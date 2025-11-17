@@ -294,9 +294,10 @@ class _InicioPageState extends State<InicioPage> {
                       child: ElevatedButton.icon(
                         onPressed: () => _callNumber(context, '911'),
                         icon: const Icon(Icons.call),
-                        label: const Text('911'),
+                        label: const Text('911', style: TextStyle(color: Colors.white),),
+                        
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: const Color.fromARGB(255, 237, 100, 32),
                           minimumSize: const Size.fromHeight(56),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                         ),
@@ -307,7 +308,7 @@ class _InicioPageState extends State<InicioPage> {
                       child: ElevatedButton.icon(
                         onPressed: () => _callNumber(context, '+1234567890'),
                         icon: const Icon(Icons.phone),
-                        label: const Text('Contacto 1'),
+                        label: const Text('Contacto 1', style: TextStyle(color: Colors.white),),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           minimumSize: const Size.fromHeight(56),
