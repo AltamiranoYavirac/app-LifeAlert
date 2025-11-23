@@ -18,36 +18,26 @@ class _OptionsPageState extends State<OptionsPage> {
   String? _insuranceCompany;
   String? _policyNumber;
   String? _insurancePhone;
-  // Historial de alertas (se mantiene en memoria durante la sesión)
-  // Cada alerta tiene: id, datetime, location (opcional), description, status
-  final List<Map<String, dynamic>> _alerts = [
-    {
-      'id': 1,
-      'datetime': DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-        'location': 'Casa',
-        'latitude': null,
-        'longitude': null,
-      'description': 'Dolor en el pecho y mareo',
-      'status': 'Resuelto',
-    },
-    {
-      'id': 2,
-      'datetime': DateTime.now().subtract(const Duration(days: 3, hours: 5)),
-        'location': 'Trabajo',
-        'latitude': null,
-        'longitude': null,
-      'description': 'Caída leve, sin heridas aparentes',
-      'status': 'Falsa alarma',
-    },
-  ];
+  
+  // Listas para medicamentos, citas médicas y alergias
+  List<String> _medications = [];
+  List<Map<String, String>> _appointments = [];
+  List<String> _allergies = [];
+  
+  // Historial de alertas
+  final List<Map<String, dynamic>> _alerts = [];
 
-  int _nextAlertId = 3;
+  int _nextAlertId = 1;
 
   @override
   void initState() {
     super.initState();
     _loadAlerts();
     _loadInsurance();
+    _loadCondition();
+    _loadMedications();
+    _loadAppointments();
+    _loadAllergies();
   }
 
   // Método público para añadir una alerta (útil para que `main.dart` llame cuando se pulse el botón rojo)
@@ -222,6 +212,118 @@ class _OptionsPageState extends State<OptionsPage> {
     });
   }
 
+  // Métodos de persistencia para Condición Médica
+  Future<void> _loadCondition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _conditionDiagnosis = prefs.getString('conditionDiagnosis');
+        _conditionSince = prefs.getString('conditionSince');
+      });
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveCondition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_conditionDiagnosis != null) await prefs.setString('conditionDiagnosis', _conditionDiagnosis!);
+      if (_conditionSince != null) await prefs.setString('conditionSince', _conditionSince!);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _clearCondition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('conditionDiagnosis');
+      await prefs.remove('conditionSince');
+    } catch (e) {
+      // ignore
+    }
+    setState(() {
+      _conditionDiagnosis = null;
+      _conditionSince = null;
+    });
+  }
+
+  // Métodos de persistencia para Medicamentos
+  Future<void> _loadMedications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? data = prefs.getString('medications');
+      if (data != null) {
+        final List<dynamic> list = jsonDecode(data);
+        setState(() {
+          _medications = list.map((e) => e as String).toList();
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveMedications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('medications', jsonEncode(_medications));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Métodos de persistencia para Citas Médicas
+  Future<void> _loadAppointments() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? data = prefs.getString('appointments');
+      if (data != null) {
+        final List<dynamic> list = jsonDecode(data);
+        setState(() {
+          _appointments = list.map((e) => Map<String, String>.from(e as Map)).toList();
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveAppointments() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('appointments', jsonEncode(_appointments));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Métodos de persistencia para Alergias
+  Future<void> _loadAllergies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? data = prefs.getString('allergies');
+      if (data != null) {
+        final List<dynamic> list = jsonDecode(data);
+        setState(() {
+          _allergies = list.map((e) => e as String).toList();
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<void> _saveAllergies() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('allergies', jsonEncode(_allergies));
+    } catch (e) {
+      // ignore
+    }
+  }
+
   void _openDetail(BuildContext context, String title) async {
     // Show custom dialogs for the first three medical info cards
     if (title == 'Condición médica') {
@@ -231,6 +333,7 @@ class _OptionsPageState extends State<OptionsPage> {
           _conditionDiagnosis = result['diagnosis'];
           _conditionSince = result['since'];
         });
+        await _saveCondition();
       }
       return;
     }
@@ -324,17 +427,15 @@ class _OptionsPageState extends State<OptionsPage> {
               ],
             ),
           ),
-            actions: <Widget>[
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
-              ElevatedButton(onPressed: () {
-                // Here you would save the data, use controllers
-                // Return the entered values to the caller (could be persisted)
-                Navigator.of(ctx).pop({
-                  'diagnosis': diagnosisController.text.trim(),
-                  'since': sinceController.text.trim(),
-                });
-              }, child: const Text('Guardar')),
-            ],
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+            ElevatedButton(onPressed: () {
+              Navigator.of(ctx).pop({
+                'diagnosis': diagnosisController.text.trim(),
+                'since': sinceController.text.trim(),
+              });
+            }, child: const Text('Guardar')),
+          ],
         );
       },
     );
@@ -344,7 +445,6 @@ class _OptionsPageState extends State<OptionsPage> {
     showDialog(
       context: context,
       builder: (ctx) {
-        List<String> meds = ['Aspirina 100mg - Cada 12 horas', 'Losartán 50mg - Una vez al día'];
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -355,122 +455,29 @@ class _OptionsPageState extends State<OptionsPage> {
                 children: <Widget>[
                   const Text('Gestiona tu lista de medicamentos', style: TextStyle(color: Colors.black54)),
                   const SizedBox(height: 12),
-                  for (int i = 0; i < meds.length; i++)
-                    Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(8)),
-                      child: ListTile(
-                        title: Text(meds[i]),
-                        trailing: TextButton(
-                          onPressed: () => setState(() => meds.removeAt(i)),
-                          child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                  if (_medications.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text('No hay medicamentos agregados', style: TextStyle(color: Colors.black54)),
+                    )
+                  else
+                    for (int i = 0; i < _medications.length; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        decoration: BoxDecoration(color: Colors.purple.shade50, borderRadius: BorderRadius.circular(8)),
+                        child: ListTile(
+                          title: Text(_medications[i]),
+                          trailing: TextButton(
+                            onPressed: () => setState(() {
+                              _medications.removeAt(i);
+                              this.setState(() {});
+                              _saveMedications();
+                            }),
+                            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                          ),
                         ),
                       ),
-                    ),
                   const SizedBox(height: 8),
-                  OutlinedButton(
-                    onPressed: () async {
-                      // Show dialog to create a new alert
-                      final result = await showDialog<Map<String, dynamic>>(
-                        context: context,
-                        builder: (dctx) {
-                          final TextEditingController descCtrl = TextEditingController();
-                          final TextEditingController placeCtrl = TextEditingController();
-                          DateTime selected = DateTime.now();
-                          final TextEditingController dateCtrl = TextEditingController(text: _formatDateTime(selected));
-                          String status = 'Alerta';
-                          return AlertDialog(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            title: const Text('Agregar alerta'),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  const Text('Descripción', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 8),
-                                  TextField(controller: descCtrl, maxLines: 3),
-                                  const SizedBox(height: 12),
-                                  const Text('Fecha y hora', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: dateCtrl,
-                                    readOnly: true,
-                                    onTap: () async {
-                                      final DateTime? pickedDate = await showDatePicker(
-                                        context: dctx,
-                                        initialDate: selected,
-                                        firstDate: DateTime(1900),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (pickedDate != null) {
-                                        final TimeOfDay? pickedTime = await showTimePicker(context: dctx, initialTime: TimeOfDay.fromDateTime(selected));
-                                        if (pickedTime != null) {
-                                          selected = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
-                                        } else {
-                                          selected = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, selected.hour, selected.minute);
-                                        }
-                                        dateCtrl.text = _formatDateTime(selected);
-                                      }
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Text('Lugar', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 8),
-                                  TextField(controller: placeCtrl, decoration: const InputDecoration(hintText: 'Ej: Casa')), 
-                                  const SizedBox(height: 12),
-                                  const Text('Estado', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 8),
-                                  DropdownButton<String>(
-                                    value: status,
-                                    items: const [
-                                      DropdownMenuItem(value: 'Alerta', child: Text('Alerta')),
-                                      DropdownMenuItem(value: 'Resuelto', child: Text('Resuelto')),
-                                      DropdownMenuItem(value: 'Falsa alarma', child: Text('Falsa alarma')),
-                                    ],
-                                    onChanged: (v) {
-                                      if (v != null) status = v;
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            actions: <Widget>[
-                              TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
-                              ElevatedButton(
-                                onPressed: () {
-                                  final desc = descCtrl.text.trim();
-                                  if (desc.isEmpty) return; // require description
-                                  Navigator.of(dctx).pop({
-                                    'datetime': selected,
-                                    'location': placeCtrl.text.trim(),
-                                    'description': desc,
-                                    'status': status,
-                                  });
-                                },
-                                child: const Text('Agregar'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                      if (result != null) {
-                        setState(() {
-                          _alerts.insert(0, {
-                            'id': _nextAlertId++,
-                            'datetime': result['datetime'] as DateTime,
-                            'location': result['location'] as String,
-                            'latitude': null,
-                            'longitude': null,
-                            'description': result['description'] as String,
-                            'status': result['status'] as String,
-                          });
-                        });
-                        await _saveAlerts();
-                      }
-                    },
-                    child: const Text('+ Agregar alerta'),
-                  ),
                   OutlinedButton(
                     onPressed: () async {
                       final result = await showDialog<Map<String, String>>(
@@ -510,7 +517,7 @@ class _OptionsPageState extends State<OptionsPage> {
                                   final name = nameCtrl.text.trim();
                                   final qty = qtyCtrl.text.trim();
                                   final freq = freqCtrl.text.trim();
-                                  if (name.isEmpty) return; // simple guard
+                                  if (name.isEmpty) return;
                                   Navigator.of(dctx).pop({'name': name, 'qty': qty, 'freq': freq});
                                 },
                                 child: const Text('Agregar'),
@@ -525,7 +532,9 @@ class _OptionsPageState extends State<OptionsPage> {
                         final qty = result['qty'] ?? '';
                         final freq = result['freq'] ?? '';
                         final entry = qty.isNotEmpty ? '$name $qty - $freq' : '$name - $freq';
-                        setState(() => meds.add(entry));
+                        setState(() => _medications.add(entry));
+                        this.setState(() {});
+                        await _saveMedications();
                       }
                     },
                     child: const Text('+ Agregar medicamento'),
@@ -546,10 +555,6 @@ class _OptionsPageState extends State<OptionsPage> {
     showDialog(
       context: context,
       builder: (ctx) {
-        List<Map<String, String>> appts = [
-          {'name': 'Dr. García', 'specialty': 'Cardiología', 'date': '15/11/2025'},
-          {'name': 'Dra. Martínez', 'specialty': 'Medicina General', 'date': '22/11/2025'},
-        ];
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -560,85 +565,92 @@ class _OptionsPageState extends State<OptionsPage> {
                 children: <Widget>[
                   const Text('Tus consultas programadas', style: TextStyle(color: Colors.black54)),
                   const SizedBox(height: 12),
-                  for (int i = 0; i < appts.length; i++)
-                    Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        title: Text(appts[i]['name'] ?? ''),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(appts[i]['specialty'] ?? ''),
-                            const SizedBox(height: 6),
-                            Text(appts[i]['date'] ?? '', style: const TextStyle(color: Colors.black54)),
-                          ],
-                        ),
-                        trailing: TextButton(
-                          onPressed: () async {
-                            // open edit modal prefilled
-                            final result = await showDialog<Map<String, String>>(
-                              context: context,
-                              builder: (dctx) {
-                                final TextEditingController nameCtrl = TextEditingController(text: appts[i]['name']);
-                                final TextEditingController specCtrl = TextEditingController(text: appts[i]['specialty']);
-                                final TextEditingController dateCtrl = TextEditingController(text: appts[i]['date']);
-                                return AlertDialog(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  title: const Text('Editar cita'),
-                                  content: SingleChildScrollView(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: <Widget>[
-                                        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
-                                        const SizedBox(height: 8),
-                                        TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Especialidad')),
-                                        const SizedBox(height: 8),
-                                        TextField(
-                                          controller: dateCtrl,
-                                          readOnly: true,
-                                          decoration: const InputDecoration(labelText: 'Fecha'),
-                                          onTap: () async {
-                                            final DateTime? picked = await showDatePicker(
-                                              context: dctx,
-                                              initialDate: DateTime.now(),
-                                              firstDate: DateTime(1900),
-                                              lastDate: DateTime(2100),
-                                            );
-                                            if (picked != null) {
-                                              dateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                            }
-                                          },
-                                        ),
-                                      ],
+                  if (_appointments.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text('No hay citas agregadas', style: TextStyle(color: Colors.black54)),
+                    )
+                  else
+                    for (int i = 0; i < _appointments.length; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          title: Text(_appointments[i]['name'] ?? ''),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(_appointments[i]['specialty'] ?? ''),
+                              const SizedBox(height: 6),
+                              Text(_appointments[i]['date'] ?? '', style: const TextStyle(color: Colors.black54)),
+                            ],
+                          ),
+                          trailing: TextButton(
+                            onPressed: () async {
+                              final result = await showDialog<Map<String, String>>(
+                                context: context,
+                                builder: (dctx) {
+                                  final TextEditingController nameCtrl = TextEditingController(text: _appointments[i]['name']);
+                                  final TextEditingController specCtrl = TextEditingController(text: _appointments[i]['specialty']);
+                                  final TextEditingController dateCtrl = TextEditingController(text: _appointments[i]['date']);
+                                  return AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    title: const Text('Editar cita'),
+                                    content: SingleChildScrollView(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: <Widget>[
+                                          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+                                          const SizedBox(height: 8),
+                                          TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Especialidad')),
+                                          const SizedBox(height: 8),
+                                          TextField(
+                                            controller: dateCtrl,
+                                            readOnly: true,
+                                            decoration: const InputDecoration(labelText: 'Fecha'),
+                                            onTap: () async {
+                                              final DateTime? picked = await showDatePicker(
+                                                context: dctx,
+                                                initialDate: DateTime.now(),
+                                                firstDate: DateTime(1900),
+                                                lastDate: DateTime(2100),
+                                              );
+                                              if (picked != null) {
+                                                dateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  actions: <Widget>[
-                                    TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.of(dctx).pop({
-                                          'name': nameCtrl.text.trim(),
-                                          'specialty': specCtrl.text.trim(),
-                                          'date': dateCtrl.text.trim(),
-                                        });
-                                      },
-                                      child: const Text('Guardar'),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                            if (result != null) {
-                              setState(() {
-                                appts[i] = result;
-                              });
-                            }
-                          },
-                          child: const Text('Editar'),
+                                    actions: <Widget>[
+                                      TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.of(dctx).pop({
+                                            'name': nameCtrl.text.trim(),
+                                            'specialty': specCtrl.text.trim(),
+                                            'date': dateCtrl.text.trim(),
+                                          });
+                                        },
+                                        child: const Text('Guardar'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                              if (result != null) {
+                                setState(() {
+                                  _appointments[i] = result;
+                                });
+                                this.setState(() {});
+                                await _saveAppointments();
+                              }
+                            },
+                            child: const Text('Editar'),
+                          ),
                         ),
                       ),
-                    ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () async {
@@ -694,7 +706,11 @@ class _OptionsPageState extends State<OptionsPage> {
                           );
                         },
                       );
-                      if (result != null) setState(() => appts.add(result));
+                      if (result != null) {
+                        setState(() => _appointments.add(result));
+                        this.setState(() {});
+                        await _saveAppointments();
+                      }
                     },
                     child: const Text('+ Agregar cita'),
                   ),
@@ -882,7 +898,6 @@ class _OptionsPageState extends State<OptionsPage> {
     showDialog(
       context: context,
       builder: (ctx) {
-        List<String> items = ['Penicilina', 'Maní'];
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -893,19 +908,29 @@ class _OptionsPageState extends State<OptionsPage> {
                 children: <Widget>[
                   const Text('Lista de alergias y reacciones adversas', style: TextStyle(color: Colors.black54)),
                   const SizedBox(height: 12),
-                  for (int i = 0; i < items.length; i++)
-                    Container(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8)),
-                      child: ListTile(
-                        leading: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                        title: Text(items[i]),
-                        trailing: TextButton(
-                          onPressed: () => setState(() => items.removeAt(i)),
-                          child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                  if (_allergies.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text('No hay alergias agregadas', style: TextStyle(color: Colors.black54)),
+                    )
+                  else
+                    for (int i = 0; i < _allergies.length; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(8)),
+                        child: ListTile(
+                          leading: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+                          title: Text(_allergies[i]),
+                          trailing: TextButton(
+                            onPressed: () => setState(() {
+                              _allergies.removeAt(i);
+                              this.setState(() {});
+                              _saveAllergies();
+                            }),
+                            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                          ),
                         ),
                       ),
-                    ),
                   const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () async {
@@ -934,7 +959,11 @@ class _OptionsPageState extends State<OptionsPage> {
                           );
                         },
                       );
-                      if (result != null && result.isNotEmpty) setState(() => items.add(result));
+                      if (result != null && result.isNotEmpty) {
+                        setState(() => _allergies.add(result));
+                        this.setState(() {});
+                        await _saveAllergies();
+                      }
                     },
                     child: const Text('+ Agregar alergia'),
                   ),
@@ -1025,70 +1054,74 @@ class _OptionsPageState extends State<OptionsPage> {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text('Información Médica', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
-            _buildCard(context, 'Condición médica', _conditionDiagnosis ?? 'Detalles de enfermedad', icon: Icons.favorite, color: Colors.red),
-            // Si hay una condición guardada, mostrar un panel con los detalles y acciones
-            if (_conditionDiagnosis != null)
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Tarjeta o Botón para Condición Médica
+            if (_conditionDiagnosis == null)
+              ElevatedButton.icon(
+                onPressed: () => _openDetail(context, 'Condición médica'),
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar Condición Médica'),
+                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              )
+            else
+              Column(
+                children: [
+                  _buildCard(context, 'Condición médica', _conditionDiagnosis ?? 'Detalles de enfermedad', icon: Icons.favorite, color: Colors.red),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Expanded(
-                            child: Text('Condición guardada', style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                          ),
                           Row(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: <Widget>[
-                              TextButton(
-                                onPressed: () async {
-                                  final result = await _showConditionDialog(context, initialDiagnosis: _conditionDiagnosis, initialSince: _conditionSince);
-                                  if (result != null) {
-                                    setState(() {
-                                      _conditionDiagnosis = result['diagnosis'];
-                                      _conditionSince = result['since'];
-                                    });
-                                  }
-                                },
-                                child: const Text('Editar', style: TextStyle(color: Colors.red)),
+                              Expanded(
+                                child: Text('Condición guardada', style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
                               ),
-                              IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _conditionDiagnosis = null;
-                                    _conditionSince = null;
-                                  });
-                                },
-                                icon: const Icon(Icons.delete_outline),
-                                color: Colors.grey,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  TextButton(
+                                    onPressed: () async {
+                                      final result = await _showConditionDialog(context, initialDiagnosis: _conditionDiagnosis, initialSince: _conditionSince);
+                                      if (result != null) {
+                                        setState(() {
+                                          _conditionDiagnosis = result['diagnosis'];
+                                          _conditionSince = result['since'];
+                                        });
+                                        await _saveCondition();
+                                      }
+                                    },
+                                    child: const Text('Editar', style: TextStyle(color: Colors.red)),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      _clearCondition();
+                                    },
+                                    icon: const Icon(Icons.delete_outline),
+                                    color: Colors.grey,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Text(_conditionDiagnosis ?? '', style: const TextStyle(fontSize: 14)),
+                          if (_conditionSince != null) ...[
+                            const SizedBox(height: 10),
+                            Text('Desde: $_conditionSince', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(_conditionDiagnosis ?? '', style: const TextStyle(fontSize: 14)),
-                      if (_conditionSince != null) ...[
-                        const SizedBox(height: 10),
-                        Text('Desde: ${"" /* placeholder replaced below */}', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
-                      ],
-                      if (_conditionSince != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(_conditionSince ?? '', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
+            // Medicamentos
             _buildCard(context, 'Medicamentos', 'Lista de medicinas actuales', icon: Icons.medication, color: Colors.purple),
-            // Mostrar resumen de seguro si existe
-            // (Insurance summary moved down near Documents section)
+            // Alergias
             _buildCard(context, 'Alergias', 'Alergias y reacciones', icon: Icons.warning_amber_rounded, color: Colors.orange),
             const SizedBox(height: 12),
             const Text('Historial y Seguimiento', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -1099,6 +1132,8 @@ class _OptionsPageState extends State<OptionsPage> {
             const SizedBox(height: 12),
             const Text('Documentos', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            _buildCard(context, 'Documentos médicos', 'Estudios y recetas', icon: Icons.description, color: Colors.deepPurple),
+            _buildCard(context, 'Información de seguro', 'Pólizas y cobertura', icon: Icons.shield, color: Colors.pink),
             // Mostrar resumen de seguro si existe (moved here)
             if (_insuranceCompany != null || _policyNumber != null || _insurancePhone != null)
               Card(
@@ -1124,14 +1159,12 @@ class _OptionsPageState extends State<OptionsPage> {
                       ),
                       const SizedBox(height: 8),
                       if (_insuranceCompany != null) Text(_insuranceCompany!, style: TextStyle(fontSize: 14, color: Theme.of(context).textTheme.bodyMedium?.color)),
-                      if (_policyNumber != null) Padding(padding: const EdgeInsets.only(top: 6.0), child: Text('Póliza: ${_policyNumber!}', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color))),
-                      if (_insurancePhone != null) Padding(padding: const EdgeInsets.only(top: 6.0), child: Text('Tel: ${_insurancePhone!}', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color))),
+                      if (_policyNumber != null) Padding(padding: const EdgeInsets.only(top: 6.0), child: Text('Póliza: $_policyNumber', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color))),
+                      if (_insurancePhone != null) Padding(padding: const EdgeInsets.only(top: 6.0), child: Text('Tel: $_insurancePhone', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color))),
                     ],
                   ),
                 ),
               ),
-            _buildCard(context, 'Documentos médicos', 'Estudios y recetas', icon: Icons.description, color: Colors.deepPurple),
-            _buildCard(context, 'Información de seguro', 'Pólizas y cobertura', icon: Icons.shield, color: Colors.pink),
             const SizedBox(height: 20),
             Card(
               color: Colors.red.shade50,
