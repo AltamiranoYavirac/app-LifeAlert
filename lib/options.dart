@@ -1007,13 +1007,24 @@ class _OptionsPageState extends State<OptionsPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Opciones'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Opciones', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Información médica y recursos', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54)),
+          ],
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
         child: ListView(
           children: <Widget>[
             const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text('Información Médica', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
             _buildCard(context, 'Condición médica', _conditionDiagnosis ?? 'Detalles de enfermedad', icon: Icons.favorite, color: Colors.red),
             // Si hay una condición guardada, mostrar un panel con los detalles y acciones
             if (_conditionDiagnosis != null)
