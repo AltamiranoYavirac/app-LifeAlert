@@ -13,13 +13,12 @@ class OptionsPage extends StatefulWidget {
 }
 
 class _OptionsPageState extends State<OptionsPage> {
-  String? _conditionDiagnosis;
-  String? _conditionSince;
   String? _insuranceCompany;
   String? _policyNumber;
   String? _insurancePhone;
   
-  // Listas para medicamentos, citas médicas y alergias
+  // Listas para condiciones médicas, medicamentos, citas médicas y alergias
+  List<Map<String, String>> _conditions = [];
   List<String> _medications = [];
   List<Map<String, String>> _appointments = [];
   List<String> _allergies = [];
@@ -34,7 +33,7 @@ class _OptionsPageState extends State<OptionsPage> {
     super.initState();
     _loadAlerts();
     _loadInsurance();
-    _loadCondition();
+    _loadConditions();
     _loadMedications();
     _loadAppointments();
     _loadAllergies();
@@ -213,41 +212,29 @@ class _OptionsPageState extends State<OptionsPage> {
     });
   }
 
-  // Métodos de persistencia para Condición Médica
-  Future<void> _loadCondition() async {
+  // Métodos de persistencia para Condiciones Médicas
+  Future<void> _loadConditions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      setState(() {
-        _conditionDiagnosis = prefs.getString('conditionDiagnosis');
-        _conditionSince = prefs.getString('conditionSince');
-      });
+      final String? data = prefs.getString('conditions');
+      if (data != null) {
+        final List<dynamic> list = jsonDecode(data);
+        setState(() {
+          _conditions = list.map((e) => Map<String, String>.from(e as Map)).toList();
+        });
+      }
     } catch (e) {
       // ignore
     }
   }
 
-  Future<void> _saveCondition() async {
+  Future<void> _saveConditions() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (_conditionDiagnosis != null) await prefs.setString('conditionDiagnosis', _conditionDiagnosis!);
-      if (_conditionSince != null) await prefs.setString('conditionSince', _conditionSince!);
+      await prefs.setString('conditions', jsonEncode(_conditions));
     } catch (e) {
       // ignore
     }
-  }
-
-  Future<void> _clearCondition() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('conditionDiagnosis');
-      await prefs.remove('conditionSince');
-    } catch (e) {
-      // ignore
-    }
-    setState(() {
-      _conditionDiagnosis = null;
-      _conditionSince = null;
-    });
   }
 
   // Métodos de persistencia para Medicamentos
@@ -328,15 +315,7 @@ class _OptionsPageState extends State<OptionsPage> {
   void _openDetail(BuildContext context, String title) async {
     // Show custom dialogs for the first three medical info cards
     if (title == 'Condición médica') {
-      final result = await _showConditionDialog(context, initialDiagnosis: _conditionDiagnosis, initialSince: _conditionSince);
-      if (result != null) {
-        if (!mounted) return;
-        setState(() {
-          _conditionDiagnosis = result['diagnosis'];
-          _conditionSince = result['since'];
-        });
-        await _saveCondition();
-      }
+      _showConditionsDialog(context);
       return;
     }
     if (title == 'Medicamentos') {
@@ -439,6 +418,87 @@ class _OptionsPageState extends State<OptionsPage> {
             }, child: const Text('Guardar')),
           ],
         );
+      },
+    );
+  }
+
+  void _showConditionsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Condiciones Médicas'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Text('Gestiona tus condiciones médicas', style: TextStyle(color: Colors.black54)),
+                  const SizedBox(height: 12),
+                  if (_conditions.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Text('No hay condiciones agregadas', style: TextStyle(color: Colors.black54)),
+                    )
+                  else
+                    for (int i = 0; i < _conditions.length; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                        child: ListTile(
+                          title: Text(_conditions[i]['diagnosis'] ?? ''),
+                          subtitle: Text('Desde: ${_conditions[i]['since'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: () async {
+                                  final result = await _showConditionDialog(context, initialDiagnosis: _conditions[i]['diagnosis'], initialSince: _conditions[i]['since']);
+                                  if (result != null) {
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _conditions[i] = result;
+                                    });
+                                    this.setState(() {});
+                                    await _saveConditions();
+                                  }
+                                },
+                                child: const Text('Editar', style: TextStyle(color: Colors.orange)),
+                              ),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  _conditions.removeAt(i);
+                                  this.setState(() {});
+                                  _saveConditions();
+                                }),
+                                child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final result = await _showConditionDialog(context);
+                      if (result != null) {
+                        if (!mounted) return;
+                        setState(() => _conditions.add(result));
+                        this.setState(() {});
+                        await _saveConditions();
+                      }
+                    },
+                    child: const Text('+ Agregar condición'),
+                  ),
+                ],
+              ),
+            ),
+            actions: <Widget>[
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cerrar')),
+            ],
+          );
+        });
       },
     );
   }
@@ -1062,71 +1122,8 @@ class _OptionsPageState extends State<OptionsPage> {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text('Información Médica', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
-            // Tarjeta o Botón para Condición Médica
-            if (_conditionDiagnosis == null)
-              ElevatedButton.icon(
-                onPressed: () => _openDetail(context, 'Condición médica'),
-                icon: const Icon(Icons.add),
-                label: const Text('Agregar Condición Médica'),
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-              )
-            else
-              Column(
-                children: [
-                  _buildCard(context, 'Condición médica', _conditionDiagnosis ?? 'Detalles de enfermedad', icon: Icons.favorite, color: Colors.red),
-                  Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: <Widget>[
-                              Expanded(
-                                child: Text('Condición guardada', style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  TextButton(
-                                    onPressed: () async {
-                                      final result = await _showConditionDialog(context, initialDiagnosis: _conditionDiagnosis, initialSince: _conditionSince);
-                                      if (result != null) {
-                                        setState(() {
-                                          _conditionDiagnosis = result['diagnosis'];
-                                          _conditionSince = result['since'];
-                                        });
-                                        await _saveCondition();
-                                      }
-                                    },
-                                    child: const Text('Editar', style: TextStyle(color: Colors.red)),
-                                  ),
-                                  IconButton(
-                                    onPressed: () {
-                                      _clearCondition();
-                                    },
-                                    icon: const Icon(Icons.delete_outline),
-                                    color: Colors.grey,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(_conditionDiagnosis ?? '', style: const TextStyle(fontSize: 14)),
-                          if (_conditionSince != null) ...[
-                            const SizedBox(height: 10),
-                            Text('Desde: $_conditionSince', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            // Tarjeta de Condiciones Médicas
+            _buildCard(context, 'Condición médica', 'Gestiona tus condiciones', icon: Icons.favorite, color: Colors.red),
             // Medicamentos
             _buildCard(context, 'Medicamentos', 'Lista de medicinas actuales', icon: Icons.medication, color: Colors.purple),
             // Alergias
