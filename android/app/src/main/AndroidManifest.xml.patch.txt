@@ -1,0 +1,13 @@
+Patch planned: add external storage permissions and requestLegacyExternalStorage attribute to application tag.
+
+Will add these lines before <application>:
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- For Android 11+ special all-files access (USE WITH CARE, Play Store restrictions): -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+And add attribute to <application> tag:
+    android:requestLegacyExternalStorage="true"
+
+Note: runtime permission requests are required in Flutter (use permission_handler). For Android 11+, MANAGE_EXTERNAL_STORAGE requires special user action to grant (Settings -> All files access).

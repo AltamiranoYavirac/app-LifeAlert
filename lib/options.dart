@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import 'symptoms.dart';
 import 'documents.dart';
 
@@ -27,6 +32,89 @@ class _OptionsPageState extends State<OptionsPage> {
   final List<Map<String, dynamic>> _alerts = [];
 
   int _nextAlertId = 1;
+  bool _storagePermissionRequested = false;
+
+  Future<void> _requestStoragePermissionIfNeeded() async {
+    if (_storagePermissionRequested) return;
+    _storagePermissionRequested = true;
+
+    try {
+      print('[storage-permission] iniciando solicitud de permisos...');
+      
+      if (Platform.isAndroid) {
+        print('[storage-permission] plataforma: Android');
+        
+        PermissionStatus status = PermissionStatus.denied;
+        
+        // Primero intentar Permission.photos (Android 13+)
+        print('[storage-permission] intentando Permission.photos (Android 13+)...');
+        status = await Permission.photos.request();
+        print('[storage-permission] Permission.photos: $status');
+        
+        // Si no fue otorgado, intentar Permission.manageExternalStorage (Android 11+)
+        if (!status.isGranted) {
+          print('[storage-permission] intentando Permission.manageExternalStorage (Android 11+)...');
+          status = await Permission.manageExternalStorage.request();
+          print('[storage-permission] Permission.manageExternalStorage: $status');
+        }
+        
+        // Si aún no fue otorgado, intentar Permission.storage (Android 10-)
+        if (!status.isGranted) {
+          print('[storage-permission] intentando Permission.storage (Android 10-)...');
+          status = await Permission.storage.request();
+          print('[storage-permission] Permission.storage: $status');
+        }
+        
+        // Verificar estado actual de permisos en el sistema
+        print('[storage-permission] verificando permisos actuales en el sistema...');
+        final photosStatus = await Permission.photos.status;
+        final manageStatus = await Permission.manageExternalStorage.status;
+        final storageStatus = await Permission.storage.status;
+        
+        print('[storage-permission] Estado actual - photos: $photosStatus, manage: $manageStatus, storage: $storageStatus');
+        
+        // Mostrar resultado al usuario SOLO SI AL MENOS UNO ESTÁ OTORGADO
+        if (mounted) {
+          if (photosStatus.isGranted || manageStatus.isGranted || storageStatus.isGranted) {
+            print('[storage-permission] ✓ al menos un permiso está activo en el sistema');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✓ Permiso de almacenamiento activado'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else if (status.isDenied) {
+            print('[storage-permission] ⚠️ permiso denegado');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Permiso de almacenamiento denegado'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else if (status.isPermanentlyDenied) {
+            print('[storage-permission] 🔒 permiso denegado permanentemente');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🔒 Permiso permanentemente denegado. Ve a Ajustes > Aplicaciones > Life Alert > Permisos > Todos los archivos'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+            // Opcional: abrir ajustes automáticamente
+            // await openAppSettings();
+          }
+        }
+      } else {
+        print('[storage-permission] plataforma no es Android');
+      }
+    } catch (e) {
+      print('[storage-permission] ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error solicitando permisos: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -37,85 +125,269 @@ class _OptionsPageState extends State<OptionsPage> {
     _loadMedications();
     _loadAppointments();
     _loadAllergies();
+    
+    // Solicitar permisos de almacenamiento inmediatamente después de que el widget esté montado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestStoragePermissionIfNeeded();
+    });
   }
 
   // Método público para añadir una alerta (útil para que `main.dart` llame cuando se pulse el botón rojo)
   Future<void> addAlert({required DateTime datetime, String? location, required String description, String status = 'Alerta'}) async {
+    print('[alerts] addAlert iniciado: datetime=$datetime description="$description" location="$location"');
+    
     String finalLocation = location ?? '';
     double? finalLat;
     double? finalLon;
+    
     // If no location provided, request permission and capture coordinates (best-effort)
     if (finalLocation.isEmpty) {
       try {
+        print('[alerts] obteniendo ubicación...');
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (!serviceEnabled) {
-          // Location services disabled
-          await _showPermissionDeniedDialog();
+          print('[alerts] servicio de ubicación deshabilitado');
+          finalLocation = 'Servicio de ubicación deshabilitado';
         } else {
           LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
           }
+          
           if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-            // Permission denied by system
-            await _showPermissionDeniedDialog();
+            print('[alerts] permiso de ubicación denegado');
+            finalLocation = 'Permiso de ubicación denegado';
           } else {
-            Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-            finalLocation = 'Lat:${pos.latitude.toStringAsFixed(5)}, Lon:${pos.longitude.toStringAsFixed(5)}';
-            finalLat = pos.latitude;
-            finalLon = pos.longitude;
+            try {
+              // Obtener posición con timeout más corto (5 segundos)
+              Position pos;
+              try {
+                pos = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.medium,
+                  timeLimit: const Duration(seconds: 5),
+                );
+              } catch (e) {
+                print('[alerts] timeout en getCurrentPosition, intentando lastKnownPosition...');
+                final lastPos = await Geolocator.getLastKnownPosition();
+                if (lastPos != null) {
+                  pos = lastPos;
+                } else {
+                  throw 'No se pudo obtener posición';
+                }
+              }
+              
+              finalLat = pos.latitude;
+              finalLon = pos.longitude;
+              print('[alerts] posición obtenida: lat=$finalLat, lon=$finalLon');
+              
+              // Obtener nombre de lugar con timeout corto también
+              try {
+                List<Placemark> placemarks = await placemarkFromCoordinates(
+                  pos.latitude,
+                  pos.longitude,
+                ).timeout(const Duration(seconds: 3), onTimeout: () {
+                  print('[alerts] timeout en geocoding, usando coordenadas...');
+                  return [];
+                });
+                
+                if (placemarks.isNotEmpty) {
+                  Placemark place = placemarks[0];
+                  final city = place.locality ?? place.subAdministrativeArea ?? 'Desconocida';
+                  final country = place.country ?? '';
+                  finalLocation = '$city, $country'.trim();
+                  print('[alerts] ubicación traducida: $finalLocation');
+                } else {
+                  finalLocation = 'Lat:${pos.latitude.toStringAsFixed(5)}, Lon:${pos.longitude.toStringAsFixed(5)}';
+                  print('[alerts] sin nombre de lugar, usando coordenadas');
+                }
+              } catch (e) {
+                // Si falla la geocodificación, usar solo coordenadas
+                finalLocation = 'Lat:${pos.latitude.toStringAsFixed(5)}, Lon:${pos.longitude.toStringAsFixed(5)}';
+                print('[alerts] error en geocodificación: $e');
+              }
+            } catch (e) {
+              print('[alerts] error obteniendo posición: $e');
+              finalLocation = 'Ubicación no disponible';
+            }
           }
         }
       } catch (e) {
-        // Ignore errors and continue without location
+        print('[alerts] error en obtención de ubicación: $e');
+        finalLocation = 'Error: $e';
       }
     }
 
+    print('[alerts] addAlert procesando: finalLocation="$finalLocation"');
+    
+    final alert = {
+      'id': _nextAlertId,
+      'datetime': datetime,
+      'location': finalLocation,
+      'latitude': finalLat,
+      'longitude': finalLon,
+      'description': description,
+      'status': status,
+      'filename': null,
+    };
+    
     setState(() {
-      _alerts.insert(0, {
-        'id': _nextAlertId++,
-        'datetime': datetime,
-        'location': finalLocation,
-        'latitude': finalLat,
-        'longitude': finalLon,
-        'description': description,
-        'status': status,
-      });
+      _alerts.insert(0, alert);
+      _nextAlertId++;
     });
+    
+    print('[alerts] alerta insertada en lista. Total alertas: ${_alerts.length}');
 
-    await _saveAlerts();
+    // persist in shared prefs and as file
+    try {
+      print('[alerts] guardando alerta a archivo...');
+      await _saveAlertToFile(_alerts.first);
+      print('[alerts] alerta guardada a archivo exitosamente');
+    } catch (e) {
+      print('[alerts] error guardando alerta a archivo: $e');
+    }
+    
+    try {
+      await _saveAlerts();
+      print('[alerts] alerta guardada en SharedPreferences');
+    } catch (e) {
+      print('[alerts] error guardando en SharedPreferences: $e');
+    }
+  }
+
+  // --- File helpers: save/load alerts to JSON files under app documents/Documentos/alerts ---
+  Future<Directory> _getAlertsDirectory() async {
+    // En Android: usar almacenamiento externo público (/storage/emulated/0/Documents/alerts)
+    // En desktop: usar carpeta del proyecto
+    // En iOS: usar documentos de la app
+    
+    if (Platform.isAndroid) {
+      // Ruta pública en almacenamiento externo
+      final dir = Directory('/storage/emulated/0/Documents/alerts');
+      if (!await dir.exists()) {
+        try {
+          await dir.create(recursive: true);
+          print('[alerts] creada carpeta pública Android: ${dir.path}');
+        } catch (e) {
+          print('[alerts] error creando carpeta pública: $e');
+        }
+      } else {
+        print('[alerts] usando carpeta pública Android: ${dir.path}');
+      }
+      return dir;
+    }
+    
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      final projDir = Directory('${Directory.current.path}${Platform.pathSeparator}Documentos${Platform.pathSeparator}alerts');
+      if (!await projDir.exists()) {
+        try {
+          await projDir.create(recursive: true);
+          print('[alerts] creada carpeta de proyecto: ${projDir.path}');
+        } catch (e) {
+          print('[alerts] no se pudo crear carpeta de proyecto, fallback: $e');
+        }
+      } else {
+        print('[alerts] usando carpeta de proyecto: ${projDir.path}');
+      }
+      return projDir;
+    }
+
+    // Fallback: use application documents directory (iOS y otros)
+    final base = await getApplicationDocumentsDirectory();
+    final dir = Directory('${base.path}${Platform.pathSeparator}Documentos${Platform.pathSeparator}alerts');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    print('[alerts] usando carpeta de documentos de la app: ${dir.path}');
+    return dir;
+  }
+
+  String _monthName(int m) {
+    const names = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return names[(m-1).clamp(0,11)];
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${_monthName(dt.month)} ${dt.day} del ${dt.year}';
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2,'0');
+    final ampm = dt.hour >= 12 ? 'pm' : 'am';
+    return '${hour.toString().padLeft(2,'0')}:$minute $ampm';
+  }
+
+  Future<void> _saveAlertToFile(Map<String, dynamic> alert) async {
+    try {
+      final dir = await _getAlertsDirectory();
+      print('[alerts] guardando alerta id=${alert['id']} en ${dir.path}');
+      final id = alert['id'] ?? DateTime.now().millisecondsSinceEpoch;
+      final filename = alert['filename'] ?? 'alert_${id}.json';
+      final file = File('${dir.path}${Platform.pathSeparator}$filename');
+      final Map<String, dynamic> jsonMap = {
+        'id': id,
+        'place': alert['location'] ?? '',
+        'date': _formatDate(alert['datetime'] as DateTime),
+        'time': _formatTime(alert['datetime'] as DateTime),
+        'timestamp': (alert['datetime'] as DateTime).millisecondsSinceEpoch,
+        'status': alert['status'] ?? 'Alerta',
+        'latitude': alert['latitude'],
+        'longitude': alert['longitude'],
+        'description': alert['description'] ?? '',
+      };
+      await file.writeAsString(jsonEncode(jsonMap), flush: true);
+      alert['filename'] = filename;
+      print('[alerts] archivo escrito: ${file.path}');
+    } catch (e) {
+      print('[alerts] error guardando archivo: $e');
+    }
+  }
+
+  Future<void> _deleteAlertFile(String? filename) async {
+    if (filename == null) return;
+    try {
+      final dir = await _getAlertsDirectory();
+      final file = File('${dir.path}${Platform.pathSeparator}$filename');
+      if (await file.exists()) {
+        await file.delete();
+        print('[alerts] archivo borrado: ${file.path}');
+      } else {
+        print('[alerts] archivo a borrar no existe: ${file.path}');
+      }
+    } catch (e) {}
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAlertsFromFiles() async {
+    final List<Map<String, dynamic>> list = [];
+    try {
+      final dir = await _getAlertsDirectory();
+      print('[alerts] cargando archivos desde: ${dir.path}');
+      final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList();
+      print('[alerts] archivos encontrados: ${files.length}');
+      for (final f in files) {
+        try {
+          final s = await f.readAsString();
+          final data = jsonDecode(s) as Map<String, dynamic>;
+          final ts = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+          list.add({
+            'id': data['id'] ?? ts,
+            'datetime': DateTime.fromMillisecondsSinceEpoch(ts),
+            'location': data['place'] ?? '',
+            'latitude': data['latitude'],
+            'longitude': data['longitude'],
+            'description': data['description'] ?? '',
+            'status': data['status'] ?? 'Alerta',
+            'filename': f.path.split(Platform.pathSeparator).last,
+          });
+        } catch (e) {
+          print('[alerts] error parseando ${f.path}: $e');
+        }
+      }
+      // sort newest first
+      list.sort((a,b) => (b['datetime'] as DateTime).compareTo(a['datetime'] as DateTime));
+    } catch (e) {}
+    return list;
   }
 
   
-
-  // Si el permiso del sistema fue denegado, mostrar diálogo con opción de abrir ajustes
-  Future<void> _showPermissionDeniedDialog() async {
-    final bool? open = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Permiso denegado'),
-          content: const Text('El permiso para acceder a la ubicación fue denegado. Puedes abrir los ajustes de la aplicación para habilitarlo.'),
-          actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Continuar sin ubicación')),
-            ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Abrir ajustes')),
-          ],
-        );
-      },
-    );
-
-    if (open == true) {
-      try {
-        await Geolocator.openAppSettings();
-      } catch (e) {
-        // ignore errors opening settings
-      }
-      if (!mounted) return;
-      // Inform the user to try again after enabling permission
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo ajustes. Vuelve a intentar la alerta después de habilitar el permiso.')));
-    }
-  }
 
   // Persistir alertas en SharedPreferences
   Future<void> _saveAlerts() async {
@@ -129,6 +401,7 @@ class _OptionsPageState extends State<OptionsPage> {
             'longitude': a['longitude'],
             'description': a['description'],
             'status': a['status'],
+            'filename': a['filename'],
           }).toList();
       await prefs.setString('alerts', jsonEncode(serializable));
       await prefs.setInt('nextAlertId', _nextAlertId);
@@ -139,6 +412,18 @@ class _OptionsPageState extends State<OptionsPage> {
 
   Future<void> _loadAlerts() async {
     try {
+      // Prefer loading alerts from files in Documentos/alerts if present
+      final fileAlerts = await _loadAlertsFromFiles();
+      if (fileAlerts.isNotEmpty) {
+        setState(() {
+          _alerts.clear();
+          _alerts.addAll(fileAlerts);
+          _nextAlertId = _alerts.isEmpty ? 1 : (_alerts.map((e) => e['id'] as int).reduce((a, b) => a > b ? a : b) + 1);
+        });
+        print('[alerts] alertas cargadas desde archivos: ${_alerts.length}');
+        return;
+      }
+      // Fallback to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final String? data = prefs.getString('alerts');
       final int? savedNext = prefs.getInt('nextAlertId');
@@ -155,6 +440,7 @@ class _OptionsPageState extends State<OptionsPage> {
               'longitude': (item['longitude'] as num?)?.toDouble(),
               'description': item['description'] as String,
               'status': item['status'] as String,
+              'filename': item['filename'],
             });
           }
           if (savedNext != null) {
@@ -163,11 +449,13 @@ class _OptionsPageState extends State<OptionsPage> {
             _nextAlertId = _alerts.isEmpty ? 1 : (_alerts.map((e) => e['id'] as int).reduce((a, b) => a > b ? a : b) + 1);
           }
         });
+        print('[alerts] alertas cargadas desde SharedPreferences: ${_alerts.length}');
       } else {
         if (savedNext != null) _nextAlertId = savedNext;
+        print('[alerts] no hay alertas guardadas');
       }
     } catch (e) {
-      // ignore
+      print('[alerts] error cargando alertas: $e');
     }
   }
 
@@ -830,6 +1118,9 @@ class _OptionsPageState extends State<OptionsPage> {
                                       if (result != null) {
                                         if (!mounted) return;
                                         setState(() => _alerts[i] = result);
+                                        try {
+                                          await _saveAlertToFile(result);
+                                        } catch (_) {}
                                         await _saveAlerts();
                                       }
                                     },
@@ -842,6 +1133,12 @@ class _OptionsPageState extends State<OptionsPage> {
                           trailing: IconButton(
                           icon: const Icon(Icons.delete_outline),
                           onPressed: () async {
+                            final filename = _alerts[i]['filename'] as String?;
+                            if (filename != null) {
+                              try {
+                                await _deleteAlertFile(filename);
+                              } catch (_) {}
+                            }
                             setState(() => _alerts.removeAt(i));
                             await _saveAlerts();
                           },
@@ -861,7 +1158,7 @@ class _OptionsPageState extends State<OptionsPage> {
     );
   }
 
-  // Mostrar diálogo con detalles de una alerta (editar descripción, lugar y estado)
+  // Mostrar diálogo con detalles de una alerta (editar solo descripción, lugar y estado)
   Future<Map<String, dynamic>?> _showAlertDetailDialog(BuildContext context, Map<String, dynamic> alert) {
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -869,7 +1166,9 @@ class _OptionsPageState extends State<OptionsPage> {
         final TextEditingController descCtrl = TextEditingController(text: alert['description'] as String);
         final TextEditingController placeCtrl = TextEditingController(text: alert['location'] as String);
         String status = alert['status'] as String;
-        final TextEditingController dateCtrl = TextEditingController(text: _formatDateTime(alert['datetime'] as DateTime));
+        final DateTime alertDateTime = alert['datetime'] as DateTime;
+        final String formattedDateTime = '${_formatDate(alertDateTime)} - ${_formatTime(alertDateTime)}';
+        
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text('Detalle de alerta'),
@@ -878,44 +1177,70 @@ class _OptionsPageState extends State<OptionsPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
+                // Fecha y Hora (solo lectura)
+                const Text('Fecha y Hora', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    formattedDateTime,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Descripción (editable)
                 const Text('Descripción', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                TextField(controller: descCtrl, maxLines: 3),
-                const SizedBox(height: 12),
-                const Text('Hora', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
                 TextField(
-                  controller: dateCtrl,
-                  readOnly: true,
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: dctx,
-                      initialDate: alert['datetime'] as DateTime,
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      dateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year} ${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
-                    }
-                  },
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    hintText: 'Descripción de la alerta',
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                
+                // Lugar (editable)
                 const Text('Lugar', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                TextField(controller: placeCtrl),
-                const SizedBox(height: 12),
+                TextField(
+                  controller: placeCtrl,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    hintText: 'Ubicación o lugar',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Estado (editable con dropdown)
                 const Text('Estado', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                DropdownButton<String>(
-                  value: status,
-                  items: const [
-                    DropdownMenuItem(value: 'Alerta', child: Text('Alerta')),
-                    DropdownMenuItem(value: 'Resuelto', child: Text('Resuelto')),
-                    DropdownMenuItem(value: 'Falsa alarma', child: Text('Falsa alarma')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) status = v;
-                  },
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButton<String>(
+                    value: status,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(value: 'Alerta', child: Text('🔴 Alerta')),
+                      DropdownMenuItem(value: 'Resuelto', child: Text('🟢 Resuelto')),
+                      DropdownMenuItem(value: 'Falsa alarma', child: Text('🟠 Falsa alarma')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) status = v;
+                    },
+                  ),
                 ),
               ],
             ),

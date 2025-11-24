@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,10 +12,11 @@ import 'preferences.dart';
 // Global key to access OptionsPage state so other pages (Inicio) can add alerts
 final GlobalKey optionsPageKey = GlobalKey();
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  print('[main] iniciando app...');
   runApp(const MyApp());
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -42,23 +42,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // pages built here so we can pass the GlobalKey to OptionsPage
-  final List<Widget> _pages = <Widget>[
-    const InicioPage(),
-    OptionsPage(key: optionsPageKey),
-    const SenttingsPage(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    print('[HomeScreen.build] renderizando con _selectedIndex: $_selectedIndex');
+
     return Scaffold(
-      body: SafeArea(child: _pages.elementAt(_selectedIndex)),
+      // Using IndexedStack to keep all pages always built and rendered (invisible ones)
+      // This ensures OptionsPage state is always available to InicioPage
+      body: SafeArea(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: <Widget>[
+            const InicioPage(),
+            OptionsPage(key: optionsPageKey),
+            const SenttingsPage(),
+          ],
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -76,7 +76,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.red,
-        onTap: _onItemTapped,
+        onTap: (index) {
+          print('[HomeScreen._onItemTapped] seleccionando index: $index');
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
   }
@@ -150,15 +155,34 @@ class _InicioPageState extends State<InicioPage> {
   }
 
   void _activateEmergency() {
+    print('[main._activateEmergency] INICIANDO ACTIVACIÓN DE EMERGENCIA');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Alerta activada: notificando contactos y servicios')),
     );
-    // Aquí podríamos añadir lógica adicional: compartir ubicación, enviar SMS, llamar a contacto, etc.
+    
     // Añadir entrada al historial de alertas en OptionsPage (si existe)
     try {
+      print('[main._activateEmergency] Intentando acceder a optionsPageKey.currentState');
       final dyn = optionsPageKey.currentState as dynamic;
-      dyn?.addAlert(datetime: DateTime.now(), location: '', description: 'Alerta activada desde botón de pánico', status: 'Alerta');
-    } catch (_) {}
+      print('[main._activateEmergency] optionsPageKey.currentState obtenido: $dyn');
+      
+      if (dyn != null) {
+        print('[main._activateEmergency] Llamando a addAlert...');
+        dyn.addAlert(
+          datetime: DateTime.now(),
+          location: '',
+          description: 'Alerta activada desde botón de pánico',
+          status: 'Alerta'
+        );
+        print('[main._activateEmergency] addAlert llamado exitosamente');
+      } else {
+        print('[main._activateEmergency] ERROR: optionsPageKey.currentState es NULL');
+      }
+    } catch (e) {
+      print('[main._activateEmergency] ERROR al llamar addAlert: $e');
+      print('[main._activateEmergency] Stack trace: ${StackTrace.current}');
+    }
+    
     // Decide based on which small button is selected
     String numberToCall = '911';
     if (_mainFavoriteIndex == 1) {
@@ -171,10 +195,13 @@ class _InicioPageState extends State<InicioPage> {
     } else {
       numberToCall = '911';
     }
+    
+    print('[main._activateEmergency] Llamando al número: $numberToCall');
     _callNumber(context, numberToCall);
     Future.delayed(const Duration(milliseconds: 800), () {
       setState(() => _holdProgress = 0.0);
     });
+    print('[main._activateEmergency] FIN DE ACTIVACIÓN DE EMERGENCIA');
   }
 
   // Nueva función para obtener ubicación

@@ -1,14 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Permisos necesarios para capturar ubicación (usados por geolocator) -->
+    <!-- Permisos para acceso a almacenamiento externo (leer/escribir). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- READ_MEDIA_IMAGES: requerido en Android 13+ (API 33+) para acceso a fotos -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- WRITE_EXTERNAL_STORAGE: necesario solo hasta Android 10 (API 29) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- MANAGE_EXTERNAL_STORAGE: requerido en Android 11+ (API 30+) para acceso a todas las carpetas -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    
+    <!-- Permisos de ubicación -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Si necesita ubicación en segundo plano, considere añadir:
-         <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-         y gestionar compatibilidad con Android 10/11/12+ -->
     <application
         android:label="Life Alert"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
