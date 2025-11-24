@@ -936,70 +936,85 @@ class _OptionsPageState extends State<OptionsPage> {
                               Text(_appointments[i]['date'] ?? '', style: const TextStyle(color: Colors.black54)),
                             ],
                           ),
-                          trailing: TextButton(
-                            onPressed: () async {
-                              final result = await showDialog<Map<String, String>>(
-                                context: context,
-                                builder: (dctx) {
-                                  final TextEditingController nameCtrl = TextEditingController(text: _appointments[i]['name']);
-                                  final TextEditingController specCtrl = TextEditingController(text: _appointments[i]['specialty']);
-                                  final TextEditingController dateCtrl = TextEditingController(text: _appointments[i]['date']);
-                                  return AlertDialog(
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    title: const Text('Editar cita'),
-                                    content: SingleChildScrollView(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: <Widget>[
-                                          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
-                                          const SizedBox(height: 8),
-                                          TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Especialidad')),
-                                          const SizedBox(height: 8),
-                                          TextField(
-                                            controller: dateCtrl,
-                                            readOnly: true,
-                                            decoration: const InputDecoration(labelText: 'Fecha'),
-                                            onTap: () async {
-                                              final DateTime? picked = await showDatePicker(
-                                                context: dctx,
-                                                initialDate: DateTime.now(),
-                                                firstDate: DateTime(1900),
-                                                lastDate: DateTime(2100),
-                                              );
-                                              if (picked != null) {
-                                                dateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                              }
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextButton(
+                                onPressed: () async {
+                                  final result = await showDialog<Map<String, String>>(
+                                    context: context,
+                                    builder: (dctx) {
+                                      final TextEditingController nameCtrl = TextEditingController(text: _appointments[i]['name']);
+                                      final TextEditingController specCtrl = TextEditingController(text: _appointments[i]['specialty']);
+                                      final TextEditingController dateCtrl = TextEditingController(text: _appointments[i]['date']);
+                                      return AlertDialog(
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        title: const Text('Editar cita'),
+                                        content: SingleChildScrollView(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: <Widget>[
+                                              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+                                              const SizedBox(height: 8),
+                                              TextField(controller: specCtrl, decoration: const InputDecoration(labelText: 'Especialidad')),
+                                              const SizedBox(height: 8),
+                                              TextField(
+                                                controller: dateCtrl,
+                                                readOnly: true,
+                                                decoration: const InputDecoration(labelText: 'Fecha'),
+                                                onTap: () async {
+                                                  final DateTime? picked = await showDatePicker(
+                                                    context: dctx,
+                                                    initialDate: DateTime.now(),
+                                                    firstDate: DateTime(1900),
+                                                    lastDate: DateTime(2100),
+                                                  );
+                                                  if (picked != null) {
+                                                    dateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        actions: <Widget>[
+                                          TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              Navigator.of(dctx).pop({
+                                                'name': nameCtrl.text.trim(),
+                                                'specialty': specCtrl.text.trim(),
+                                                'date': dateCtrl.text.trim(),
+                                              });
                                             },
+                                            child: const Text('Guardar'),
                                           ),
                                         ],
-                                      ),
-                                    ),
-                                    actions: <Widget>[
-                                      TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.of(dctx).pop({
-                                            'name': nameCtrl.text.trim(),
-                                            'specialty': specCtrl.text.trim(),
-                                            'date': dateCtrl.text.trim(),
-                                          });
-                                        },
-                                        child: const Text('Guardar'),
-                                      ),
-                                    ],
+                                      );
+                                    },
                                   );
+                                  if (result != null) {
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _appointments[i] = result;
+                                    });
+                                    this.setState(() {});
+                                    await _saveAppointments();
+                                  }
                                 },
-                              );
-                              if (result != null) {
-                                if (!mounted) return;
-                                setState(() {
-                                  _appointments[i] = result;
-                                });
-                                this.setState(() {});
-                                await _saveAppointments();
-                              }
-                            },
-                            child: const Text('Editar'),
+                                child: const Text('Editar', style: TextStyle(color: Colors.blue)),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _appointments.removeAt(i);
+                                  });
+                                  this.setState(() {});
+                                  _saveAppointments();
+                                },
+                                child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
                           ),
                         ),
                       ),
