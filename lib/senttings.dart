@@ -16,9 +16,6 @@ class SenttingsPage extends StatefulWidget {
 }
 
 class _SenttingsPageState extends State<SenttingsPage> {
-  bool _notifications = true;
-  bool _location = true;
-
   // Profile photo bytes (persisted as base64)
   Uint8List? _profilePhoto;
   static const String _profilePhotoKey = 'profile_photo_base64';
@@ -263,26 +260,6 @@ class _SenttingsPageState extends State<SenttingsPage> {
     );
   }
 
-  // --- Alertas y Notificaciones ---
-  Future<void> _toggleNotifications(bool value) async {
-    setState(() => _notifications = value);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(
-        value ? 'Notificaciones activadas' : 'Notificaciones desactivadas'
-      )),
-    );
-  }
-
-  Future<void> _toggleLocation(bool value) async {
-    setState(() => _location = value);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(
-        value ? 'Compartiendo ubicación GPS' : 'Ubicación GPS desactivada'
-      )),
-    );
-  }
-
-
   void _showEditProfileDialog() {
     final nombresController = TextEditingController(text: _nombres);
     final apellidosController = TextEditingController(text: _apellidos);
@@ -463,44 +440,6 @@ class _SenttingsPageState extends State<SenttingsPage> {
 
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
-              child: Text('Alertas y Notificaciones', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
-
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Column(
-                children: <Widget>[
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    secondary: CircleAvatar(
-                      backgroundColor: Colors.amber.shade50,
-                      child: const Icon(Icons.notifications, color: Colors.amber),
-                    ),
-                    title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Alertas push activadas', style: TextStyle(fontSize: 13)),
-                    value: _notifications,
-                    onChanged: _toggleNotifications,
-                  ),
-                  const Divider(height: 1),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    secondary: CircleAvatar(
-                      backgroundColor: Colors.blue.shade50,
-                      child: const Icon(Icons.location_on, color: Colors.blue),
-                    ),
-                    title: const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Compartir ubicación GPS', style: TextStyle(fontSize: 13)),
-                    value: _location,
-                    onChanged: _toggleLocation,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8.0),
               child: Text('Contactos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             ),
 
@@ -514,69 +453,87 @@ class _SenttingsPageState extends State<SenttingsPage> {
                     final contacto = entry.value;
                     return Column(
                       children: [
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: idx % 2 == 0 ? Colors.blue.shade50 : Colors.green.shade50,
-                            child: const Icon(Icons.phone, color: Colors.blue),
-                          ),
-                          // Cambiado para responsive: sin maxLines, softWrap true
-                          title: Text(
-                            contacto['nombre'] ?? '',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: nameFontSize),
-                            softWrap: true,
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              contacto['telefono'] ?? '',
-                              style: TextStyle(fontSize: phoneFontSize),
-                              softWrap: true,
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Favorite star (uses global notifier)
-                              ValueListenableBuilder<Map<String, String>?>(
-                                valueListenable: preferredContact,
-                                builder: (context, fav, _) {
-                                  final bool isFav = fav != null && fav['telefono'] == (contacto['telefono'] ?? '');
-                                  return IconButton(
-                                    constraints: const BoxConstraints(), // Reduce area extra
-                                    padding: const EdgeInsets.all(8),
-                                    icon: Icon(isFav ? Icons.star : Icons.star_border, size: 22),
-                                    color: isFav ? Colors.amber : Colors.grey,
-                                    onPressed: () async {
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      if (isFav) {
-                                        await setPreferredContact(null);
-                                        messenger.showSnackBar(const SnackBar(content: Text('Contacto favorito removido')));
-                                      } else {
-                                        await setPreferredContact({'nombre': contacto['nombre'] ?? '', 'telefono': contacto['telefono'] ?? ''});
-                                        messenger.showSnackBar(const SnackBar(content: Text('Contacto marcado como favorito')));
-                                      }
-                                      if (!mounted) return;
-                                      setState(() {});
-                                    },
-                                  );
-                                },
+                              // Leading avatar
+                              CircleAvatar(
+                                backgroundColor: idx % 2 == 0 ? Colors.blue.shade50 : Colors.green.shade50,
+                                child: const Icon(Icons.phone, color: Colors.blue),
                               ),
-                              TextButton(
-                                onPressed: () => _showContactoDialog(index: idx),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              const SizedBox(width: 12),
+                              // Title and subtitle with Expanded to prevent truncation
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      contacto['nombre'] ?? '',
+                                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: nameFontSize),
+                                      softWrap: true,
+                                      overflow: TextOverflow.visible,
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        contacto['telefono'] ?? '',
+                                        style: TextStyle(fontSize: phoneFontSize),
+                                        softWrap: true,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: const Text('Editar', style: TextStyle(color: Colors.red, fontSize: 13)),
                               ),
-                              IconButton(
-                                constraints: const BoxConstraints(),
-                                padding: const EdgeInsets.all(8),
-                                icon: const Icon(Icons.delete_outline, size: 22),
-                                color: Colors.grey,
-                                onPressed: () => _showDeleteConfirmDialog(idx),
+                              const SizedBox(width: 8),
+                              // Action buttons
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Favorite star (uses global notifier)
+                                  ValueListenableBuilder<Map<String, String>?>(
+                                    valueListenable: preferredContact,
+                                    builder: (context, fav, _) {
+                                      final bool isFav = fav != null && fav['telefono'] == (contacto['telefono'] ?? '');
+                                      return IconButton(
+                                        constraints: const BoxConstraints(), // Reduce area extra
+                                        padding: const EdgeInsets.all(8),
+                                        icon: Icon(isFav ? Icons.star : Icons.star_border, size: 22),
+                                        color: isFav ? Colors.amber : Colors.grey,
+                                        onPressed: () async {
+                                          final messenger = ScaffoldMessenger.of(context);
+                                          if (isFav) {
+                                            await setPreferredContact(null);
+                                            messenger.showSnackBar(const SnackBar(content: Text('Contacto favorito removido')));
+                                          } else {
+                                            await setPreferredContact({'nombre': contacto['nombre'] ?? '', 'telefono': contacto['telefono'] ?? ''});
+                                            messenger.showSnackBar(const SnackBar(content: Text('Contacto marcado como favorito')));
+                                          }
+                                          if (!mounted) return;
+                                          setState(() {});
+                                        },
+                                      );
+                                    },
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _showContactoDialog(index: idx),
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      minimumSize: const Size(0, 0),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text('Editar', style: TextStyle(color: Colors.red, fontSize: 13)),
+                                  ),
+                                  IconButton(
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.all(8),
+                                    icon: const Icon(Icons.delete_outline, size: 22),
+                                    color: Colors.grey,
+                                    onPressed: () => _showDeleteConfirmDialog(idx),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -597,7 +554,7 @@ class _SenttingsPageState extends State<SenttingsPage> {
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [Icon(Icons.add), SizedBox(width: 8), Text('+ Agregar contacto')],
+                        children: const [Icon(Icons.add), SizedBox(width: 8), Text('Agregar contacto')],
                       ),
                     ),
                   ),

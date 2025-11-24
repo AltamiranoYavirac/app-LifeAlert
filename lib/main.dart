@@ -444,12 +444,12 @@ class _InicioPageState extends State<InicioPage> {
                     ),
                     if (_mainFavoriteIndex == 0)
                       Positioned(
-                        top: 6,
-                        right: 6,
+                        top: (buttonHeight * 0.06).clamp(3.0, 8.0),
+                        right: (buttonHeight * 0.06).clamp(3.0, 8.0),
                         child: Container(
                           decoration: BoxDecoration(color: Colors.yellow.shade700, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)]),
-                          padding: const EdgeInsets.all(6),
-                          child: const Icon(Icons.star, size: 20, color: Colors.white),
+                          padding: EdgeInsets.all((buttonHeight * 0.08).clamp(3.0, 6.0)),
+                          child: Icon(Icons.star, size: (buttonHeight * 0.25).clamp(10.0, 18.0), color: Colors.white),
                         ),
                       ),
                   ],
@@ -507,12 +507,12 @@ class _InicioPageState extends State<InicioPage> {
                     ),
                     if (_mainFavoriteIndex == 1 && _preferredContact != null)
                       Positioned(
-                        top: 6,
-                        right: 6,
+                        top: (buttonHeight * 0.06).clamp(3.0, 8.0),
+                        right: (buttonHeight * 0.06).clamp(3.0, 8.0),
                         child: Container(
                           decoration: BoxDecoration(color: Colors.yellow.shade700, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)]),
-                          padding: const EdgeInsets.all(6),
-                          child: const Icon(Icons.star, size: 20, color: Colors.white),
+                          padding: EdgeInsets.all((buttonHeight * 0.08).clamp(3.0, 6.0)),
+                          child: Icon(Icons.star, size: (buttonHeight * 0.25).clamp(10.0, 18.0), color: Colors.white),
                         ),
                       ),
                   ],
