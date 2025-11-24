@@ -1165,99 +1165,109 @@ class _OptionsPageState extends State<OptionsPage> {
       builder: (dctx) {
         final TextEditingController descCtrl = TextEditingController(text: alert['description'] as String);
         final TextEditingController placeCtrl = TextEditingController(text: alert['location'] as String);
-        String status = alert['status'] as String;
         final DateTime alertDateTime = alert['datetime'] as DateTime;
         final String formattedDateTime = '${_formatDate(alertDateTime)} - ${_formatTime(alertDateTime)}';
         
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Detalle de alerta'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // Fecha y Hora (solo lectura)
-                const Text('Fecha y Hora', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    formattedDateTime,
-                    style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String status = alert['status'] as String;
+            
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text('Detalle de alerta'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // Fecha y Hora (solo lectura)
+                    const Text('Fecha y Hora', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        formattedDateTime,
+                        style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Descripción (editable)
+                    const Text('Descripción', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        hintText: 'Descripción de la alerta',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Lugar (editable)
+                    const Text('Lugar', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: placeCtrl,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        hintText: 'Ubicación o lugar',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Estado (editable con dropdown)
+                    const Text('Estado', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String>(
+                        value: status,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 'Alerta', child: Text('🔴 Alerta')),
+                          DropdownMenuItem(value: 'Resuelto', child: Text('🟢 Resuelto')),
+                          DropdownMenuItem(value: 'Falsa alarma', child: Text('🟠 Falsa alarma')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDialogState(() {
+                              alert['status'] = v;
+                              status = v;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                
-                // Descripción (editable)
-                const Text('Descripción', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    hintText: 'Descripción de la alerta',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Lugar (editable)
-                const Text('Lugar', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: placeCtrl,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    hintText: 'Ubicación o lugar',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Estado (editable con dropdown)
-                const Text('Estado', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButton<String>(
-                    value: status,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: 'Alerta', child: Text('🔴 Alerta')),
-                      DropdownMenuItem(value: 'Resuelto', child: Text('🟢 Resuelto')),
-                      DropdownMenuItem(value: 'Falsa alarma', child: Text('🟠 Falsa alarma')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) status = v;
-                    },
-                  ),
+              ),
+              actions: <Widget>[
+                TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () {
+                    final updated = Map<String, dynamic>.from(alert);
+                    updated['description'] = descCtrl.text.trim();
+                    updated['location'] = placeCtrl.text.trim();
+                    updated['status'] = status;
+                    Navigator.of(dctx).pop(updated);
+                  },
+                  child: const Text('Guardar'),
                 ),
               ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(dctx).pop(), child: const Text('Cancelar')),
-            ElevatedButton(
-              onPressed: () {
-                final updated = Map<String, dynamic>.from(alert);
-                updated['description'] = descCtrl.text.trim();
-                updated['location'] = placeCtrl.text.trim();
-                updated['status'] = status;
-                Navigator.of(dctx).pop(updated);
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
